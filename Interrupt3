@@ -1,0 +1,46 @@
+
+#include <AT89X51.h>     // I/O 가 정의되어 있는 헤더 파일
+unsigned char sec,on_buf,flag; // 전역 변수
+// LCD로 디스플레이할 메시지
+code unsigned char msg1[] = " Timer0 Timer ! ";
+code unsigned char msg2[] = "  1sec ON/OFF.  ";
+// P0.4-P0.7 : 데이터, P2.4=RS, P2.5=RW,P2.6=E
+#include "LCD4.h"             // LCD 초기설정 루틴이 정의
+// 8비트 데이터 메모리로 사용할 경우(MDA-A_D8051 TRAINER)
+// 인터럽트 처리 루틴
+void T0_INT(void) interrupt 1
+{
+      TR0 = 0;        // 타이머 정지
+      sec--;          // sec - 1
+      if(sec == 0){
+       sec = 29;      // 시정수 다시 저장
+       flag = 1;
+      }
+      TH0 = TL0 = 0;  // 타이머 시정수 다시 저장
+      TR0 = 1;        // 타이머 런
+}
+
+// 메인
+void main(void)
+{
+   L_INIT();       // LCD 초기 설정
+   DISPLAY();      // msg1, msg2 디스플레이
+   // 타이머0 모드1 지정.
+   TMOD = 0x01;
+   TH0 = TL0 = 0;   // 시정수 65536저장.
+   PT0 =1;
+   ET0 = 1;
+   EA = 1;
+   // LCD_ON 초기 값
+   on_buf = 0x07;
+   sec = 29;         //256x256x29x0.54[us](22.1184MHz일 경우) = 1초
+   TR0 = 1;
+   // 1초 대기
+   do{
+     flag = 0;       // 인터럽트 플래그 클리어
+     while(!flag);   // 인터럽트 대기
+     // 커서 조정
+     on_buf = ((on_buf ^ 0x07) & 0x07) | 0x08;  // LCD ON/OFF 토글
+     COMMAND(on_buf);
+   }while(1);
+}
