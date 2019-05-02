@@ -1,0 +1,81 @@
+/****************************************
+* MDA-MULTI MICOM 
+* MCU : MCS51
+* COMPILER : KEIL
+* FILE NAME : DOT32_16.C
+****************************************/
+/*****************************************
+        < 배선 하기 >
+P1.0 ~ P1.7 ==> [32*16 DOT MATRIX MODULE] A0,A1,A2,A3,RED,GREEN,LATCH,CLOCK
+******************************************/
+
+#include <AT89X51.h>     // I/O 가 정의되어 있는 헤더 파일
+// P1.0 ~ P1.3 : 어드레스
+#define  RED    P1_4       // 적색 데이터
+#define  GREEN  P1_5       // 녹색 데이터
+#define  LATCH  P1_6       // 래치
+#define  CLOCK  P1_7       // 클록
+// "도 트" 폰트
+code unsigned long FONT[16] =  {0x01800180,0x03c003c0,0x07e007e0,0x0db00db0,
+                                0x19981998,0x318c318c,0x61866186,0xc183c183,
+                                0x81818181,0x01800180,0x01800180,0x01800180,
+                                0x01800180,0x01800180,0x01800180,0x01800180};
+// 메인
+void main(void)
+{
+  unsigned char font_c;      // 폰트 카운터
+  unsigned long font_b;      // 폰트 저장
+  unsigned int temp;         // 임시 저장
+  unsigned char i,j,k,addr,state;
+   // 폰트 출력 OFF
+   state = 0;
+   do{
+     for (j = 0; j < 100; j++){
+       font_c = 0;                      // 폰트 카운터 초기 설정
+       for (addr=0; addr < 16; addr++){ // 어드레스 0-15까지 루프
+          font_b = FONT[addr];          // 폰트 저장
+          temp = font_b;                // 16 x 16 폰트 저장
+         // long 변수로 하면 시간이 너무 걸려서 떨림 현상을
+         // 방지할 수 없기 때문에 int 변수로 나누어서 디스플레이한다.
+         // 16 x 16 폰트 2번 디스플레이
+         for (k=0; k < 2; k++){
+           for (i=0; i < 16; i++){        // 행을 0-15까지 루프
+             if (temp & 0x0001){         // 폰트 on
+               if (state == 0) {
+                 RED=1; GREEN=0;          // 적색
+               } // if 
+               else if (state == 1){      // 녹색
+                 RED=0; GREEN=1;
+               } // else if
+               else {                     // 앰버색 
+                 RED=1; GREEN =1;
+               } // else  
+             }  // if
+             else {
+               RED=0; GREEN = 0;          // OFF
+             }   // else 
+             // 클럭 출력
+             CLOCK = 1;
+             CLOCK = 0;
+             temp >>= 1;
+           }  // i 변수에 대한 for 문
+          // 다음 16 x 16 폰트 
+          temp = font_b >> 16;
+         }  // k 변수에 대한 for 문
+         // 어드레스 출력
+         P1 = (P1 & 0xf0) | addr;
+         // 래치 출력
+         LATCH = 1;
+         LATCH = 0;
+         // 행 점등 시간
+         for (i=0; i < 5; i++){
+           CLOCK = 1;                  // 클럭 출력
+           CLOCK = 0;
+         } // 행 점등 시간 for 문
+       }  // addr for 문
+     } // j-for 문  
+     // 색 업데이트
+     state++;
+     if (state == 3) state =0;         
+   }while(1); // 무한 루프
+}
