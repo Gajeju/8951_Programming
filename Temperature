@@ -1,0 +1,158 @@
+/****************************************
+* MDA-MULTI MICOM 
+* MCU : MCS51
+* COMPILER : KEIL
+* FILE NAME : DS1620.C
+****************************************/
+/*****************************************
+        < 배선 하기 >
+P2.0 ~ P2.7 ==> [LCD] D0 ~ D7
+P1.4 ~ P1.6 ==> [LCD] RS,RW,E
+P3.4 ~ P3.6 ==> [TEMPERATURE] DQ,CLK,RST
+******************************************/
+
+#include <AT89X51.h>     // I/O 가 정의되어 있는 헤더 파일
+#define   DQ        P3_4
+#define   SCLK      P3_5    // SCK 핀 정의
+#define   RST       P3_6    // RST  핀 정의
+// LCD로 디스플레이할 문자
+const unsigned char msg1[]=" Thermometer !! ";
+const unsigned char msg2[]=" Temp.:         ";
+const unsigned char degree[]= {0x02,0x05,0x02,0x00,0x00,0x00,0x00,0x00};  //도
+#include "LCD8.h"             // LCD 초기설정 루틴이 정의
+// 8비트 데이터 메모리로 사용할 경우(MDA-A_D8051 TRAINER)
+// DS1620으로 데이터 전송
+void  SEND(unsigned char data0)
+{
+    unsigned char i;
+     // 데이터 전송
+    for(i = 0; i<8; i++){
+     SCLK = 0;            // 클록 0
+     DQ = data0 & 0x01;  // 데이터 "1","0"을 전송
+     SCLK = 1;            // 클록 1
+     data0 >>= 1;         // 다음 데이터
+    }
+}
+// DS1620에서 데이터를 수신해서 리턴
+unsigned char RECEIVE(void)
+{
+    unsigned char i,data0,data1;
+    data0  = 0;           // 데이터 초기 값
+    data1 = 1;
+    // 8비트 데이터 입력
+    // 데이터가 최하위 비트부터 전송되므로
+    // 최하위부터 8비트 데이터를 만든다.
+    DQ = 1;       //  데이터 핀 초기 설정
+    for(i=0; i<8; i++){
+     SCLK = 0;            // 클록 0
+      if(DQ == 1 ) data0 |= data1;
+     SCLK = 1;            // 클록 1
+     data1 <<= 1;
+    }
+    return data0;
+}
+//lcd로 디스플레이
+void DISP_LCD(unsigned char t0, unsigned char t)
+{
+    unsigned char t1,t2,t3;
+    t3 = t & 0x01;       // 최하위 비트 저장
+    t >>= 1;             // 오른쪽으로 1비트 이동
+    // 9번째 비트가 "1"인 경우 "-"
+    if( t0 == 0x01 ){
+        COMMAND(0xc7);   // 커서 조정
+        CHAR_O( '-' );   // "-" 출력
+        t = ~t;          // 데이터를 2의 보수
+        t += 1;
+    }
+    // "+"인 경우는 생략
+    COMMAND(0xc8);       // 커서 조정
+    // 10진 변환
+    t2 = t/100;          // 몫을 구한다.
+    //100의자리가 있는 경우
+    if( t2 != 0x00 ){
+        t2 += 0x30;      // ASCII코드로 변환
+        CHAR_O(t2);      // LCD 출력
+        t2 = t%100;      // 나머지를 구한다.
+        t1 = t2/10;      // 10의 자리
+        t1 += 0x30;      // ASCII로 변환
+      }
+     //100의 자리가 없는 경우
+     else{
+        t2 = t%100;      // 100의 자리 나머지
+        t1 = t2/10;      // 10의 자리
+        if( t1 == 0x00 ) t1 = ' ';  // 없는 경우 공백
+        else t1 += 0x30;            // 있는 경우 ASCII 코드로 변환
+    }
+    // t1을 LCD로 출력
+    CHAR_O( t1 );
+    t1 = t2%10;          // 10의 자리
+    t1 += 0x30;          // ASCII 코드로 변환
+    CHAR_O( t1 );        // t1을 LCD로 출력
+    //소수점 출력
+    CHAR_O('.');
+    if( t3 & 0x01 ) CHAR_O('0');  //나머지가 있는 경우 "0.0"
+    else CHAR_O('5');             //나머지가 없는 경우 "0.5"
+     // 공백 출력
+    CHAR_O(0x00);       // 도 값 출력
+    CHAR_O('C');        // 도 출력
+    CHAR_O(0x20);
+}
+// 메인
+void main(void)
+{
+   unsigned char data0,data1;
+
+   RST = 0;        // DS1620 리셋  
+   SCLK = 0;       // DS1620 클록
+   DQ = 1;         // DS1620 데이터 "1"
+   // LCD 초기 설정
+   L_INIT();
+   // msg1, msg2 디스플레이
+   DISPLAY();
+   // 한글 폰트 로드
+   for (data0=0; data0<8; data0++){
+    COMMAND(data0 | 0x40);     // 캐릭터 RAM 어드레스 설정
+    CHAR_O(degree[data0]);     // 폰트 로드
+    }
+   // 무한 루프
+    while(1){
+      RST = 0;  // 리셋
+      RST = 1;  // 리셋 해제
+      // 컨피크레이션 레지스터 읽기 명령 전송
+      SEND(0xac);
+      data0 = RECEIVE();    // 수신
+      RST = 0;             // 리셋
+      // 3선 통신 가능, 원 쇼트 변환인지 검사
+      if((data0 & 0x03 ) != 0x03 ){
+       // 아니면 모드 셋
+       RST = 1;        // 리셋 해제
+       SEND(0x0c);     // 컨피크레이션 레지스터 쓰기 코맨드 전송
+       SEND(0x03);     // 3선 통신, 원 쇼트 변환
+       RST = 0;        // 리셋
+       }
+       // 온도 변환 정지 명령 전송
+       RST = 1;        // 리셋 해제
+       SEND(0x22);
+       RST = 0;        // 리셋
+       // 온도 변환 시작
+       RST = 1;        // 리셋 해제
+       SEND(0xee);
+       RST = 0;        // 리셋
+       // 변환이 끝날 때 까지 대기
+       do{
+          RST = 1;     // 리셋 해제
+          SEND(0xac);  // 컨피크레이션 레지스터 읽기 명령 전송
+          data0 = RECEIVE();  // 수신
+          RST = 0;            // 리셋
+         }while((data0 & 0x80) != 0x80); // 변환 중?
+       // 온도 읽기 명령 전송
+       RST = 1;              // 리셋 해제
+       SEND(0xaa);
+       // TH 읽기
+       data0 = RECEIVE();
+       data1 = RECEIVE();
+       RST = 0;             // 리셋
+       // LCD로 디스플레이
+       DISP_LCD(data1,data0);
+    }
+}
