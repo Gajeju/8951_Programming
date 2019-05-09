@@ -1,0 +1,98 @@
+/****************************************
+* MDA-MULTI MICOM 
+* MCU : MCS51
+* COMPILER : KEIL
+* FILE NAME : CDS.C
+****************************************/
+/*****************************************
+        < 배선 하기 >
+P2.0 ~ P2.7 ==> [LCD] D0 ~ D7
+P1.4 ~ P1.6 ==> [LCD] RS,RW,E
+P1.0 ~ P1.3 ==> [CPU보드의A/D CONVERTER] CS,DIN,DOUT,CLK
+[CPU보드의A/D CONVERTER] CH0 ==> [SENSER] CDS
+******************************************/
+#include <AT89X51.h>     // I/O 가 정의되어 있는 헤더 파일
+#define     CS   P1_0    // MCP3202 핀 정의
+#define     DIN  P1_1
+#define     DOUT P1_2
+#define     CLK  P1_3
+// LCD로 디스플레이할 메시지
+code unsigned char msg1[]="L     CdS      H";
+code unsigned char msg2[]="                ";
+#include "LCD8.h"           // LCD 초기설정 루틴이 정의
+// A/D 변환, 변환 값을 8비트만 리턴 한다. 
+unsigned char Converter(void)
+{
+    unsigned char Cnt,out8;
+    unsigned int out;
+   // 클록 핀 초기 설정
+    CLK = 0;
+    DIN = 0;     // 데이터 핀 초기 설정
+    // MCP3202 동작 
+    CS = 0;
+    DIN = 1;     // START 비트 전송
+    CLK = 1;     // 클록 전송
+    CLK = 0;
+    // 싱글 모드
+    DIN = 1;
+    CLK = 1;     // 클록 전송
+    CLK = 0;
+   // ODD(채널 0 선택)
+    DIN = 0;
+    CLK = 1;     // 클록 전송     
+    CLK = 0;
+    // 최하위 비트가 처음 전송
+    DIN = 1;
+    CLK = 1;     // 클록 전송     
+    CLK = 0;
+    // null 클록
+    CLK = 1;
+    CLK = 0;
+    // 변환된 데이터 읽어내기
+    out = 0x0000;
+    for( Cnt = 0; Cnt < 12; Cnt ++ ){
+         out <<= 1;                     // 데이터 이동
+         CLK = 1;                       // 클록 전송
+         if( DOUT == 1 ) out |= 0x0001; // "1"인 경우
+         CLK = 0;
+    }
+    // MCP3202 동작 정지
+    CS = 1;
+    CLK = 1;
+    out8 = out >> 4;  // 8비트로 만든다.
+    return out8;
+}
+// 변환 결과를 LCD 바로 디스플레이
+void LCD_DISP(unsigned char result)
+{
+    unsigned char i;
+    // result값을 전압으로 변환
+    result = (result >> 4) & 0x0f;    // 16등분한다.
+    // 디스플레이
+    COMMAND(0xc0);       // 커서 조정(LCD8.h 참조)
+    // 2라인을 지운다.
+    for (i=0; i<16; i++){
+      CHAR_O(' ');       // 공백
+    }
+    // 2번째 라인에 바 디스플레이
+    COMMAND(0xc0);       // 커서 조정(LCD8.h 참조)
+    // 2라인에 바를 result 값만큼 디스플레이
+    for (i=0; i < result; i++){
+      CHAR_O(0xff);       // 바 폰트
+    }
+    COMMAND(0xd0); // 커서 조정(LCD8.h 참조)
+}
+// 메인
+void    main( void )
+{
+       unsigned int result;
+       L_INIT();                 // LCD 초기 설정
+       DISPLAY();                // LCD 문자 디스플레이
+       // 계속 동작
+       do{
+          result = Converter();  // 서미스터 값 A/D 변환
+          // LCD 디스플레이
+          LCD_DISP(result);
+          DELAY(65000);          // 일정 시간 지연
+         }while(1);
+}
