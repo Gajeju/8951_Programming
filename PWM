@@ -1,0 +1,159 @@
+/****************************************
+* MDA-MULTI MICOM 
+* MCU : MCS51
+* COMPILER : KEIL
+* FILE NAME : DC_PWM.C
+****************************************/
+
+/*****************************************
+        < 배선 하기 >
+P2.0 ~ P2.7 ==> [LCD] D0 ~ D7
+P1.4 ~ P1.6 ==> [LCD] RS,RW,E
+P3.4 ==> [PWM CONTROL] SPD
+P1.0 ~ P1.2 ==> [PWM CONTROL] PWM,DIR,EN
+P3.0 ~ P3.3 ==> [SWITCH] X4 ~ X7
+******************************************/
+/*****************************************
+        동작 설명
+MDA-Multi MICOM PROGRAMER의 "데이터 통신 윈도우"를 선택하고
+화면에서 마우스의 오른쪽 버튼을 클럭 후 "시리얼 초기화(9600BPS)"를 선택하고
+통신포트 설정 윈도우에서 통신포트를 초기화 한다.
+
+        조작해줘야할 사항.
+DC PWM부분의 토글 스위치를 PWM방향으로 토글.
+
+SWITCH 부분의 X4  : DC모터 동작하고 1초가 되면 LCD로 디스플레이.
+SWITCH 부분의 X5 : DC모터 정지.
+SWITCH 부분의 X6 : 시계 방향으로 회전.
+SWITCH 부분의 X7 : 반시계 방향으로 회전.
+******************************************/
+
+#include <AT89X51.h>     // I/O 가 정의되어 있는 헤더 파일
+// DC 모터 인터페이스
+#define	  SPD   P3_4   // COUNT
+#define	  PWM   P1_0
+#define	  DIR   P1_1
+#define	  EN    P1_2
+/* P1.4 - P1.7 스위치 기능 */
+#define	  RUN   P3_0
+#define	  STOP  P3_1
+#define	  CCW   P3_2
+#define	  CW    P3_3
+code unsigned char msg1[] = "PWM Period 50Hz ";
+code unsigned char msg2[] = "Speed: 0000 rps ";
+/* 전역 변수로 선언 */
+unsigned char count, speed;
+unsigned int  DUTY,T_ON,T_OFF;
+bit	Flag;
+#include "LCD8.h"             // LCD 초기설정 루틴이 정의
+// 8비트 데이터 메모리로 사용할 경우(MDA-A_D8051 TRAINER)
+/* 타이머 0 인터럽트 함수 */
+void T0_int(void) interrupt 1
+{
+        /* 슬롯 수가 14개이기 때문에 14개의 펄스가 입력되면
+           1 회전되었으므로 speed 를 +1 증가한다 */
+        speed ++;
+        TH0 = 256-14;
+}
+/* 타이머 1 인터럽트 함수 */
+void	T1_int(void) interrupt 3
+{
+        TR1 = 0;       /* 타이머 정지 */
+        count++;       /* 인터럽트 수 카운팅 */
+        /* Flag =1 이면 현재 T_ON, Flag =0 이면 현재 T_OFF
+           T_OFF 시간이었으면 T_ON 시간을 설정한다 */
+        if (Flag == 0){
+                TH1 = (65536 - T_ON ) >> 8;
+                TL1 = (65536 - T_ON ) & 0x00ff;
+        	PWM = 1;         // 모터 ON
+                Flag = 1;        // 다음은 T_OFF
+                }
+        // T_ON 시간이었으면 T_OFF 시간을 설정한다.
+        else{
+              TH1 = ( 65536 - T_OFF ) >> 8;
+              TL1 = ( 65536 - T_OFF ) & 0x00ff;
+              PWM = 0;           // 모터 OFF
+              Flag = 0;          // 다음은 T_ON
+        }
+        TR1 = 1;                 /* 타이머 런 */
+}
+
+/* 속도 디스플레이 */
+void SPEED_DISP(void)
+{
+    unsigned char msd,lsd,temp;
+    msd = lsd = 0;
+    msd = speed/100;
+    temp = speed%100;
+    /* 10의 자리 */
+    lsd = temp/10;
+    lsd <<= 4;
+    lsd = ((temp%10) & 0x0f) | lsd;
+    /* LCD 디스플레이 */
+    COMMAND(0xc7);   /* 커서 조정 */
+    CHAR_O(((msd >> 4) & 0x0f)+0x30);
+    CHAR_O((msd & 0x0f)+0x30);
+    CHAR_O(((lsd >> 4) & 0x0f)+0x30);
+    CHAR_O((lsd & 0x0f)+0x30);
+}
+void    main( void )
+{
+       L_INIT();
+       DISPLAY();
+       P1 = 0xf0;  // 모터 동작 불가능
+       /* 타이머 1, 타이머 모드,모드 1, GATE OFF
+          타이머 0, 카운터 모드,모드 2, GATE OFF */
+       TMOD = 0x16;
+       /* 50[Hz]1초에 대한 시정수는 다음과 같이 계산한다.
+     	  22.1184[MHz]/12 = 1843200.  1/1843200 = 0.5425[uS]
+          50[Hz]에 대한 시정수는 0.02[s]/0.5425[uS] = 36866 */
+       DUTY = 36866;
+       /* PWM 주기 및 ON, OFF 시간 */
+       T_ON = DUTY / 2;              /* DUTY의 1/2이 TON */
+       T_OFF = DUTY - T_ON;
+       TH1 = (65536-T_ON) >> 8;      /* 상위 값 저장 */
+       TL1 = (65536-T_ON) & 0x00ff;  /* 하위 값 저장 */
+       
+       /* 모터 인코더에 연결되어 있는 슬롯수 14 */
+       TH0 = TL0 = 256-14;
+       /* 타이머 0,1 인터럽트 인에이블 및 타이머 0,1 런 */
+       ET0 = 1;
+       ET1 = 1;
+       TR0 = 1;
+       EA = 1;
+       Flag = 1;        // 모터 플래그 ON
+       do{
+          // 키브드 스캔
+          if( !RUN ) {
+             count = 0;          
+             EN = 1;     // 모터 ON      
+             TR1 = 1;    // 타이머 1 동작    
+          }
+          else if( !STOP ) {
+             EN = 0;     // 모터 OFF      
+             TR1 =0;     // 타이머 1 동작 정지   
+          }
+          else if( !CW ) {
+             DIR = 0;          
+          }
+          else if( !CCW ) {
+             DIR = 1;          
+          }
+          /* 50[Hz] 가, T_ON, T_OFF로 나누어져 있기 때문에
+             count가 50이 되면 1초 */
+          if (count == 50){
+              EA = 0;        /* 디스플레이하는 동안 인터럽트 디스에이블*/
+              ET0 = 0;             
+              ET1 =0;
+              TR1 =0;
+              count = 0;     /* 1초를 만드는 카운트값 클리어 */
+              /* 속도 디스플레이 */
+              SPEED_DISP();
+              speed = 0;     /* 속도 버퍼 클리어 */
+              TR1 = 1;
+              ET0 = 1;                           
+              ET1 =1;              
+              EA = 1;        /* 인터럽트 인에이블 */
+          }          
+        }while(1);
+}
