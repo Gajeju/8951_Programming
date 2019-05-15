@@ -1,0 +1,18 @@
+#include <AT89X51.h>
+
+sbit speaker = P1^0;
+
+void delay(unsigned char i)
+{
+    while(i--);
+}
+
+void main(void)
+{
+    do {
+        speaker = 1;
+        delay(0x7f);
+        speaker = 0;
+        delay(0x7f);
+    }while(1);
+}
