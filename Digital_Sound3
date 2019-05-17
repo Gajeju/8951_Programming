@@ -1,0 +1,66 @@
+#include <AT89X51.h>
+
+sbit speaker = P2^0;
+unsigned char freq_H, freq_L;
+
+void TMR0_int(void) interrupt 1
+{
+    TR0 = 0;
+    speaker =~ speaker;
+    TH0 = freq_H;
+    TL0 = freq_L;
+    TR0 = 1;
+    return;
+}
+
+void main(void)
+{
+    unsigned char sw;
+    
+    TMOD = 0x11;
+    ET0 = 1;
+    PT0 = 1;
+    EA = 1;
+    TR0 = 0;
+    
+    speaker = 0;
+    P1 = 0xff;
+    do {
+        do {
+            sw = P1;
+        } while(sw == 0xff);
+        
+        if (sw == 0xfe) {
+            TH0 = 0xfe; TL0 = 0x22;
+            freq_H = 0xfe; freq_L = 0x22;
+        } else if (sw == 0xfd) {
+            TH0 = 0xfe; TL0 = 0x56;
+            freq_H = 0xfe; freq_L = 0x56;
+        } else if (sw == 0xfb) {
+            TH0 = 0xfe; TL0 = 0x84;
+            freq_H = 0xfe; freq_L = 0x84;
+        } else if (sw == 0xf7) {
+            TH0 = 0xfe; TL0 = 0x9a;
+            freq_H = 0xfe; freq_L = 0x9a;
+        } else if (sw == 0xef) {
+            TH0 = 0xfe; TL0 = 0xc1;
+            freq_H = 0xfe; freq_L = 0xc1;
+        } else if (sw == 0xdf) {
+            TH0 = 0xfe; TL0 = 0xe3;
+            freq_H = 0xfe; freq_L = 0x23;
+        } else if (sw == 0xbf) {
+            TH0 = 0xff; TL0 = 0x02;
+            freq_H = 0xff; freq_L = 0x02;
+        } else if (sw == 0x7f) {
+            TH0 = 0xff; TL0 = 0x11;
+            freq_H = 0xff; freq_L = 0x11;
+        }
+        TR0 = 1;
+         do {
+             sw = P1;
+         }while(sw != 0xff);
+    
+         speaker = 0;
+         TR0 = 0;
+    }while(1);
+}
