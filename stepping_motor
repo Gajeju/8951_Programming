@@ -1,0 +1,33 @@
+#include <AT89X51.h>
+
+unsigned char i;
+code unsigned char pulse[] = {0x01, 0x02, 0x04, 0x08};
+
+void TMR0_int(void) interrupt 1
+{
+    TR0 = 0;
+    P1 = pulse[i];
+    i++;
+    if (i == 4) i = 0;
+    TH0 = 0xf9;
+    TL0 = 0x7e;
+    TR0 = 1;
+
+    return;
+}
+
+void main(void)
+{
+    TMOD = 0x11;
+    TH0 = 0xf9;
+    TL0 = 0x7e;
+
+    ET0 = 1;
+    PT0 = 1;
+    EA = 1;
+    TR0 = 1;
+
+    i = 0;
+    while(1);
+
+}
