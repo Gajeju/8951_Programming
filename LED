@@ -1,0 +1,56 @@
+/****************************************
+* MDA-MULTI MICOM 
+* MCU : MCS51
+* COMPILER : IAR
+* FILE NAME : LED1.C
+****************************************/
+
+/****************************************
+*     < 배선 하기 >
+* PB0 ~ PB7 ==> [LED]Y0 ~ Y7
+* PA0,PA1 ==> [SWITCH]X0,X1
+*****************************************/
+
+#include <io89s51.h>
+unsigned char temp;     // LED ON/OFF 저장 전역 변수
+// 일정 시간 지연 함수
+void delay (long i)
+{
+   while (i--);
+}
+// 시프트 레프트
+void SHIFTL (void)
+{
+   if(temp == 0xff) { // 이 동작이 처음인지 검사
+      temp = 0xfe;    // 초기 값 저장
+  } 
+  else {
+     temp = (temp << 1)|0x01;        // LED ON 값 업데이트
+     if (temp == 0xff) temp = 0xfe;  // 마지막 LED가 ON인 경우 초기 값 저장
+  }
+  delay (60000); //일정 시간 지연
+}
+// 시프트 라이트
+void SHIFTR (void)
+{
+   if(temp == 0xff) {  // 이 동작이 처음인지 검사
+      temp = 0x7f;     // 초기 값 저장
+   }
+   else{
+      temp = (temp >> 1)|0x80;       // LED ON 값 업데이트
+      if (temp == 0xff) temp = 0x7f; // 마지막 LED가 ON인 경우 초기 값 저장
+   }
+   delay (60000); //일정 시간 지연
+}
+// 메인
+void main(void)
+{
+   temp = 0xff;    // LED ON/OFF 초기 값
+   P2 = 0xff;
+   do{
+     P1 = temp;                 // P1으로 출력
+     if( P2_0 ) SHIFTL();       // X0 스위치="1"인 경우
+     else if( P2_1 ) SHIFTR();  // X1 스위치="1"인 경우
+     else temp = 0xff;          // X0,X1 스위치="1"인 경우
+   }while(1);                   // 무한 루프
+}
