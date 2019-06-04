@@ -1,0 +1,75 @@
+#include <AT89x51.h>
+
+void delay(unsigned int i)
+{
+    while(i--);
+}
+
+unsigned char pow(unsigned char a)
+{
+    unsigned char i;
+    unsigned char result = 1;
+    
+    for (i = 0; i < a; i++)
+    {
+        result *= 2;
+    }
+    return result;
+}
+
+
+
+void main(void)
+{
+    unsigned char sw = 0;
+    unsigned char index1 = 0;
+    unsigned char index2 = 1;
+    unsigned char index3 = 2;
+    unsigned char index4 = 3;
+
+    while(1)
+    {
+        P1 = 0xff;
+        sw = P1;
+
+
+      //스위치에 따른 출력
+      if (sw == 0xfe)
+      {
+
+        P2 = 0xff - pow(index1);
+        delay(30000);
+
+
+      }
+      else if (sw == 0xfd)
+      {
+        P2 = 0xff - pow(index1) - pow(index2);
+        delay(30000);
+      }
+      else if (sw == 0xfb)
+      {
+        P2 = 0xff - pow(index1) - pow(index2) - pow(index3);
+        delay(30000);
+      }
+      else if (sw == 0xf7)
+      {
+        P2 = 0xff - pow(index1) - pow(index2) - pow(index3) - pow(index4);
+        delay(30000);
+      }
+
+      P2 = 0xff;
+      index1++;
+      index2++;
+      index3++;
+      index4++;
+
+      if (index1 == 8) index1 = 0;
+      if (index2 == 8) index2 = 0;
+      if (index3 == 8) index3 = 0;
+      if (index4 == 8) index4 = 0;
+
+      delay(1000);
+
+    }
+}
