@@ -1,0 +1,85 @@
+#include<AT89X51.h>
+
+unsigned char table[10]= {0x40, 0x79, 0x24, 0x30, 0x19, 0x12, 0x02, 0x78, 0x00, 0x10};
+unsigned int sumTable[4][4] =
+{
+ {12, 13, 14, 15},
+ {8,  9,  10, 11},
+ {4,  5,  6,  7},
+ {0,  1,  2,  3}
+
+};
+
+void delay(unsigned char ms)
+{
+    unsigned int i, j;
+    for (i = 0; i < ms; i++)
+        for (j = 1; j <= 125; j++);
+}
+
+void display(unsigned int sum)
+{
+    unsigned int seg1 = sum % 10;
+    unsigned int seg2 = sum / 10;
+
+    P0 = 0xfe;
+    P1 = table[seg1];
+    delay(10);
+    P1 = 0xff;
+
+    P0 = 0xfd;
+    P1 = table[seg2];
+    delay(10);
+    P1 = 0xff;
+}
+
+
+void main(void)
+{
+    unsigned int i;
+    unsigned int input;
+    unsigned int sum = 0;
+
+    P0 = 0xfe;
+    P1 = table[sum];
+
+
+    for (;;)
+    {
+        P2 = 0xfe;
+
+        for (i = 0; i < 4; i++)
+        {
+            input = P2 & (0xf0);
+
+
+            if (input == 0x70)
+            {
+                 sum += sumTable[0][i];
+                 delay(500);
+                 break;
+            }
+            else if (input == 0xb0)
+            {
+                 sum += sumTable[1][i];
+                 delay(500);
+                 break;
+            }
+            else if (input == 0xd0)
+            {
+                 sum += sumTable[2][i];
+                 delay(500);
+                 break;
+            }
+            else if (input == 0xe0)
+            {
+                 sum += sumTable[3][i];
+                 delay(500);
+                 break;
+            }
+            P2 = P2 << 1 | 0x01;
+        }
+        display(sum);
+        if (P0_7 == 0) sum = 0;
+    }
+}
