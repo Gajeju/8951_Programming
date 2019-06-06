@@ -1,8 +1,10 @@
 #include <AT89x51.h>
 
-void delay(unsigned int i)
+void delay(unsigned int ms)
 {
-    while(i--);
+    unsigned int i,j;
+    for (i = 0; i <= ms; i++)
+        for (j = 0; j <= 125; j++);
 }
 
 unsigned char pow(unsigned char a)
@@ -38,24 +40,24 @@ void main(void)
       {
 
         P2 = 0xff - pow(index1);
-        delay(30000);
+        delay(100);
 
 
       }
       else if (sw == 0xfd)
       {
         P2 = 0xff - pow(index1) - pow(index2);
-        delay(30000);
+        delay(100);
       }
       else if (sw == 0xfb)
       {
         P2 = 0xff - pow(index1) - pow(index2) - pow(index3);
-        delay(30000);
+        delay(100);
       }
       else if (sw == 0xf7)
       {
         P2 = 0xff - pow(index1) - pow(index2) - pow(index3) - pow(index4);
-        delay(30000);
+        delay(100);
       }
 
       P2 = 0xff;
@@ -69,7 +71,7 @@ void main(void)
       if (index3 == 8) index3 = 0;
       if (index4 == 8) index4 = 0;
 
-      delay(1000);
+      delay(100);
 
     }
 }
