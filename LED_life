@@ -60,12 +60,13 @@ void choose(void)			//LED 우선순위 정의
 
 void time_reset(void)		//time 배열 reset
 {
+    unsigned int i;
     if (P0_0 == 0)
     {
-       time[0] = 0;
-       time[1] = 1;
-       time[2] = 2;
-       time[3] = 3;
+       for (i = 0; i < 4; i++)
+       {
+           time[i] = i;
+       }
     }
 }
 
